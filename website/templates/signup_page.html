@@ -2,11 +2,12 @@
 <html>
 <head>
     <title>Fashion Web Page</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='signup_page/style.css') }}" >
     <!-- Add Bootstrap CSS link -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-4bw+/aepP/YC94hEpVNVgiZdgIC5+VKNBQNGCHeKRQN+PtmoHDEXuppvnDJzQIu9" crossorigin="anonymous">
 </head>
-<meta name="viewport" content="width=device-width, initial-scale=1">
+
 <body>
     <!-- Use Bootstrap container for better content alignment -->
     
@@ -83,12 +84,13 @@
             <div id="errorMsg"></div>
             <div class="content">
                 
-                <form class="signup" name="signupForm" onsubmit="return validateSignupForm()" method="POST">
-                    <input type="email" name="email" id="signEmail" placeholder="Email">
-                    <input type="text" name="name" id="signName" placeholder="Username">
-                    <input type="password" name="password" id="signPassword" placeholder="Password"><br>
-                    <input type="submit" value="SignUp">
-                </form>
+              <form class="signup" name="signupForm" onsubmit="return validateSignupForm()" method="POST">
+                <input type="email" name="email" id="signEmail" placeholder="Email">
+                <input type="text" name="name" id="signName" placeholder="Name">
+                <input type="password" name="password" id="signPassword" placeholder="Password">
+                <input type="password" name="confirm-password"  placeholder="Confirm Password"><br>
+                <input type="submit" value="SignUp">
+             </form>
             </div>
         </div>
     </div>
