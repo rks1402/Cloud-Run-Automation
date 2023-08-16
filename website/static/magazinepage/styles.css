@@ -102,7 +102,7 @@ body {
     font-weight: bold;
   }
 .product-image {
-    height: 220px;
+    height: 340px;
     overflow-y: auto;
     margin-bottom: 10px;/* Adjust as needed */
 }
