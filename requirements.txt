@@ -3,3 +3,4 @@ gunicorn
 google-cloud-datastore
 bcrypt
 google-cloud-storage
+google-generativeai
