@@ -7,6 +7,7 @@ import hashlib
 import random
 import string
 import os
+import google.generativeai as palm
 from google.cloud import storage
 from google.cloud import datastore
 import requests
@@ -457,7 +458,17 @@ def fetch_search_data():
 
     return render_template('homepage.html', products=products, page=page, per_page=per_page, total_pages=total_pages)
 
+#api_key1 = "AIzaSyBILoEiGuHDHaagHfuOR8SEPnh5BmutOV0"
+api_key = "AIzaSyBILoEiGuHDHaagHfuOR8SEPnh5BmutOV0"
+palm.configure(api_key=api_key)
 
+@views.route('/submit_chat', methods=['POST'])
+def submit_chat():
+    chat_id = request.form['chat_id']
+    response = palm.generate_text(prompt=chat_id+"Give the User Occasion and demographics from this conversation in JSON format.")
+    print(response.result)
 
-      
+    return jsonify(response.result)
+
+     
 
