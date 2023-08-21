@@ -137,7 +137,7 @@ def chat_summary():
 def chathistory():    
     chat_id = session.get('chat_id')
     if chat_id is None:
-        summary = "Chat with bot is present."
+        summary = "Chat on Style Me to see summary."
     else:
         summary = chat_summary()
     return render_template('chathistory.html', summary = summary)    
