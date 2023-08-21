@@ -135,8 +135,12 @@ def chat_summary():
 
 @views.route('/chathistory')
 def chathistory():    
-    summary = chat_summary()
-    return render_template('chathistory.html', summary = summary)
+    chat_id = session.get('chat_id')
+    if chat_id is None:
+        summary = "Chat with bot is present."
+    else:
+        summary = chat_summary()
+    return render_template('chathistory.html', summary = summary)    
 
 def fetch_products_lookalike():
     response = requests.get('https://full-iqcjxj5v4a-el.a.run.app/get_all_product')
@@ -551,11 +555,9 @@ def submit_chat():
 
     chat = request.form['chat']
     conversation = parse_conversation(chat)
-    chat_conversation = {"conversation": conversation}  # Removed the jsonify call here
+    chat_conversation = {"conversation": conversation}
 
     response_message = store_conversation_in_datastore(chat_conversation)
-
-    return jsonify({"message": response_message})
 
     # Test POST request
     prompt = chat + "Give the User Occasion and demographics from this conversation in JSON format."
