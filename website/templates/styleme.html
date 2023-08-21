@@ -37,7 +37,7 @@
                         <a class="nav-link" href="{{ url_for('views.lookalike') }}">Look-Alike</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('views.chathistory') }}">Chat-History</a>
+                        <a class="nav-link" href="{{ url_for('views.chathistory') }}">Fashion Advisor</a>
                     </li>
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown"
@@ -76,6 +76,9 @@
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('auth.signup') }}">Signup</a>
                     </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('auth.logout') }}">Logout</a>
+                    </li>
                 </ul>
             </div>
         </div>
@@ -89,7 +92,7 @@
         <div class="form-box">
             <form action="/submit_chat" method="post">
                 <div class="input-group">
-                    <textarea class="form-control" name="chat_id" rows="5"
+                    <textarea class="form-control" name="chat" rows="5"
                         placeholder="Enter your chat script here"></textarea>
                     <button class="btn btn-outline-secondary" type="submit">Submit Chat</button>
                 </div>
