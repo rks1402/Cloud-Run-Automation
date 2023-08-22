@@ -1,6 +1,10 @@
-from flask import jsonify, request
+from flask import jsonify, request, render_template
 from flask import Blueprint, render_template, url_for, request, session, redirect, Flask, jsonify, flash
 from google.cloud import datastore
+from google.cloud import vision_v1
+from google.cloud.vision_v1 import types
+from colorthief import ColorThief
+import io
 import json
 import datetime
 import hashlib
@@ -89,7 +93,7 @@ def magazine():
     return render_template('magazine.html')
 
 
-@views.route('/upload', methods=['POST'])
+"""@views.route('/upload', methods=['POST'])
 def upload():
     file = request.files['file']
     if file:
@@ -106,7 +110,50 @@ def upload():
         return redirect('/lookalike')
 
     flash('No File is Selected.', 'danger')
-    return redirect('/lookalike')
+    return redirect('/lookalike')"""
+
+def analyze_image(image_file):
+    # Initialize the Vision API client
+    client = vision_v1.ImageAnnotatorClient()
+
+    # Read the image content from the uploaded file
+    image_content = image_file.read()
+
+    # Create a Vision API image object from the content
+    image = types.Image(content=image_content)
+
+    # Perform label detection using Vision API
+    response = client.label_detection(image=image)
+    labels = [label.description for label in response.label_annotations]
+
+    # Use colorthief to get the dominant color
+    color_thief = ColorThief(io.BytesIO(image_content))
+    dominant_color = color_thief.get_color(quality=1)
+
+    # Create a JSON output with analysis results
+    analysis_result = {
+        "labels": labels,
+        "dominant_color": dominant_color
+    }
+
+    return analysis_result
+
+@views.route("/upload", methods=["POST"])
+def upload():
+    print("Analyzing image...")
+    if "file" not in request.files:
+        return jsonify({"error": "No file part"})
+
+    file = request.files["file"]
+    if file.filename == "":
+        return jsonify({"error": "No selected file"})
+
+    if file:
+        analysis_result = analyze_image(file)
+        return jsonify(analysis_result)
+    
+    print("Analysis results:", analysis_result)
+    return jsonify(analysis_result)
 
 def chat_summary():
 
@@ -135,12 +182,8 @@ def chat_summary():
 
 @views.route('/chathistory')
 def chathistory():    
-    chat_id = session.get('chat_id')
-    if chat_id is None:
-        summary = "Chat on Style Me to see summary."
-    else:
-        summary = chat_summary()
-    return render_template('chathistory.html', summary = summary)    
+    summary = chat_summary()
+    return render_template('chathistory.html', summary = summary)
 
 def fetch_products_lookalike():
     response = requests.get('https://full-iqcjxj5v4a-el.a.run.app/get_all_product')
@@ -548,6 +591,40 @@ def store_conversation_in_datastore(conversation_data):
             "message": str(e)
         }
     
+def get_product_by_json_summary(summary):
+    try:
+        print(type(summary))
+        # Make a POST request to the cloud function
+        response = requests.post("https://asia-south1-gen-ai-app.cloudfunctions.net/get-product-by-ocassion-and-demographics", json = summary)
+
+        print(response)
+        response_data = response.json()  # Parse the response JSON
+        print(response_data)
+        return response_data
+        
+        
+    except Exception as e:
+        return {
+            "message": str(e)
+        }
+    
+def get_products_by_id():
+    try:
+        
+        product_ids = {"product_ids": ["A03", "A07", "A10", "F08", "F12"]}
+        # Make a POST request to the cloud function
+        response = requests.post("https://asia-south1-gen-ai-app.cloudfunctions.net/get-products-by-id", json = product_ids)
+
+        print(response)
+        response_data = response.json()  # Parse the response JSON
+        print(response_data)
+        return response_data
+        
+        
+    except Exception as e:
+        return {
+            "message": str(e)
+        }    
 
 @views.route('/submit_chat', methods=['POST'])
 def submit_chat():
@@ -555,20 +632,50 @@ def submit_chat():
 
     chat = request.form['chat']
     conversation = parse_conversation(chat)
-    chat_conversation = {"conversation": conversation}
+    chat_conversation = {"conversation": conversation}  # Removed the jsonify call here
 
     response_message = store_conversation_in_datastore(chat_conversation)
 
+    #return jsonify({"message": response_message})
+    occasion_demographics = """
+    {
+        "Occasion": "wedding",
+        "color": "black",
+        "material": "silk",
+        "pattern": "solid",
+        "Demographics": {
+            "Budget": {
+            "Min": 150,
+            "Max": 200
+            },
+            "gender": "men",
+            "Style": "Classic and Elegant"
+        }
+    }
+        """
     # Test POST request
-    prompt = chat + "Give the User Occasion and demographics from this conversation in JSON format."
+    prompt = chat + "Give the User Occasion and demographics from this conversation in JSON format." + occasion_demographics + "Don't give color. and gender can be only from (boys,girls,women and men)"
     data = {"content": prompt}
 
     response_post = requests.post(API_URL, json=data)
     if response_post.status_code == 200:
         response_data = response_post.json()
         summary = response_data.get("summary", "No summary available.")
-        
-        return summary
+        try:
+            summary_dict = json.loads(summary)
+            print(summary_dict)  # This should now be a dictionary
+            product_ids = get_product_by_json_summary(summary_dict)
+            # Rest of your code
+        except json.JSONDecodeError as e:
+            print("Failed to decode JSON:", e)
+        #return summary
+        #return product_ids  # Return the product_ids as JSON response
+        print(product_ids)
+        print(type(product_ids))
+        products = get_products_by_id()
+        return products
+        return render_template('styleme.html', products=products)
+    
     else:
         print("POST Request Failed!")
         print(response_post.text)
