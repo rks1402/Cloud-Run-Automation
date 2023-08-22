@@ -673,7 +673,7 @@ def submit_chat():
         print(product_ids)
         print(type(product_ids))
         products = get_products_by_id()
-        return products
+        #return products
         return render_template('styleme.html', products=products)
     
     else:
