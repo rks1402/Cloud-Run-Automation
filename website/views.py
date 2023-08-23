@@ -92,6 +92,9 @@ def styleme():
 def magazine():    
     return render_template('magazine.html')
 
+@views.route('/marketing')
+def marketing():
+    return render_template('marketing.html')
 
 """@views.route('/upload', methods=['POST'])
 def upload():
@@ -182,7 +185,10 @@ def chat_summary():
 
 @views.route('/chathistory')
 def chathistory():    
-    summary = chat_summary()
+    if 'chat_id' in session :
+        summary = chat_summary()
+    else:
+        summary = "chat on style me to see summary."    
     return render_template('chathistory.html', summary = summary)
 
 def fetch_products_lookalike():
@@ -608,10 +614,10 @@ def get_product_by_json_summary(summary):
             "message": str(e)
         }
     
-def get_products_by_id():
+def get_products_by_id(product_ids):
     try:
         
-        product_ids = {"product_ids": ["A03", "A07", "A10", "F08", "F12"]}
+        
         # Make a POST request to the cloud function
         response = requests.post("https://asia-south1-gen-ai-app.cloudfunctions.net/get-products-by-id", json = product_ids)
 
@@ -672,13 +678,16 @@ def submit_chat():
         #return product_ids  # Return the product_ids as JSON response
         print(product_ids)
         print(type(product_ids))
-        products = get_products_by_id()
+        products = get_products_by_id(product_ids)
         #return products
         return render_template('styleme.html', products=products)
     
     else:
         print("POST Request Failed!")
         print(response_post.text)
+
+
+        
 
      
 
