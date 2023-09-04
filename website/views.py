@@ -103,6 +103,33 @@ def magazines(magazine_id):
 
     return render_template('magazine.html', articles=articles)
 
+def fetch_products_with_discount(discount_value):
+    try:
+        # Create a client to interact with Google Cloud Datastore
+        client = datastore.Client()
+
+        # Define the kind (entity type) in Datastore
+        kind = "MasterData"
+
+        # Define a query to filter products with a specific discount
+        query = client.query(kind=kind)
+        query.add_filter("discount", "=", str(discount_value))
+
+        # Print the query being executed
+        print(f"Executing query: {query}")
+
+        # Execute the query and fetch matching products
+        matching_products = list(query.fetch())
+
+        # Print the number of matching products
+        print(f"Found {len(matching_products)} matching products")
+
+        return matching_products
+    except Exception as e:
+        print(f"Error fetching products: {str(e)}")
+        return []
+
+datastore_client= datastore.Client()
 @views.route('/marketing')
 def marketing():
     if 'chat_id' in session:
@@ -117,18 +144,24 @@ def marketing():
             # Get the summary from the conversation entity
             summary = conversation_entity.get("summary", "No summary available.")
         
+    
+        
         json= '''{
             "age": 35,
         "gender": "female",
         "income": "high",
-        "education": "bachelor's degree",
         "occupation": "professional",
+        "tone of text": "friendly"
         "location": "urban"
         }'''
         
+        # Generate a random discount percentage between 5% and 25%
+        discount_value = random.randint(1, 5) * 5
+        
         # Test POST request
-        prompt = summary + "Read the above passage and create a promotion advertisement banner text as one liner for the clothing ,return the user data in JSON format like this"
+        prompt = summary + f" Read the above passage and create a promotion advertisement banner text as one liner for the clothing, return the user data in JSON format like this."
         data = {"content": prompt}
+        
 
         response_post = requests.post(API_URL, json=data)
         if response_post.status_code == 200:
@@ -141,8 +174,12 @@ def marketing():
                 json_part = match.group(1)
                 text_part = match.group(2)
             
-            products = fetch_products_lookalike() #for testing
-            return render_template('marketing.html', json_part=json_part,text_part=text_part,summary=summary,products=products)
+            products = fetch_products_with_discount(discount_value)
+            # products = response.json()
+            
+           
+          
+            return render_template('marketing.html', json_part=json_part,text_part=text_part,summary=summary,products=products[:3], discount=discount_value)
         
         else:
             print("POST Request Failed!")
@@ -251,7 +288,10 @@ def chathistory():
     else:
         summary = "chat on style me to see summary."    
     
-    products =session.get('products')
+    if 'products' in session :
+        products = session.get('products')
+    else:
+        products = fetch_products_lookalike()
     return render_template('chathistory.html', products=products, summary = summary)
 
 def fetch_products_lookalike():
@@ -742,6 +782,7 @@ def submit_chat():
         print(product_ids)
         print(type(product_ids))
         products = get_products_by_id(product_ids)
+        session['products'] = products
         #return products
         return render_template('styleme.html', products=products)
     
