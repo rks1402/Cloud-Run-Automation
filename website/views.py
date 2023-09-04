@@ -1,5 +1,5 @@
 from flask import jsonify, request, render_template
-from flask import Blueprint, render_template, url_for, request, session, redirect, Flask, jsonify, flash
+from flask import Blueprint, render_template, url_for, request, session, redirect, Flask, jsonify, flash, make_response
 from google.cloud import datastore
 from google.cloud import vision_v1
 from google.cloud.vision_v1 import types
@@ -15,6 +15,7 @@ import google.generativeai as palm
 from google.cloud import storage
 from google.cloud import datastore
 import requests
+
 import re
 
 views = Blueprint('views', __name__)
@@ -103,6 +104,27 @@ def magazines(magazine_id):
 
     return render_template('magazine.html', articles=articles)
 
+
+# Initialize the Datastore client
+datastore_client = datastore.Client()
+
+def fetchCustomerMetrics():
+    try:
+        customer_id = "C001"
+        print(customer_id)
+        if not customer_id:
+            return 'Missing customerId parameter', 400
+
+        query = datastore_client.query(kind='metric')  
+        # Add a filter to fetch data specific to the provided customer ID
+        query.add_filter('customer_id', '=', customer_id)
+
+        entities = list(query.fetch())
+        
+        return entities
+    except Exception as e:
+        return str(e), 500
+
 def fetch_products_with_discount(discount_value):
     try:
         # Create a client to interact with Google Cloud Datastore
@@ -129,6 +151,9 @@ def fetch_products_with_discount(discount_value):
         print(f"Error fetching products: {str(e)}")
         return []
 
+
+
+    
 datastore_client= datastore.Client()
 @views.route('/marketing')
 def marketing():
@@ -162,6 +187,7 @@ def marketing():
         prompt = summary + f" Read the above passage and create a promotion advertisement banner text as one liner for the clothing, return the user data in JSON format like this."
         data = {"content": prompt}
         
+        json_metrics = fetchCustomerMetrics()
 
         response_post = requests.post(API_URL, json=data)
         if response_post.status_code == 200:
@@ -179,7 +205,7 @@ def marketing():
             
            
           
-            return render_template('marketing.html', json_part=json_part,text_part=text_part,summary=summary,products=products[:3], discount=discount_value)
+            return render_template('marketing.html', json_metrics=json_metrics, json_part=json_part,text_part=text_part,summary=summary,products=products[:3], discount=discount_value)
         
         else:
             print("POST Request Failed!")
