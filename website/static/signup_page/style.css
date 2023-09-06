@@ -55,7 +55,7 @@ body {
 }
 
 .dropdown-item {
-    color: #fff !important;
+    color: #464343 !important;
 }
 
 .dropdown-item:hover {
@@ -225,6 +225,17 @@ input[type=checkbox] {
     text-align: left;
     color: #4a90e2;
     font-size: 15px;
+}
+.header a {
+    transition: color 0.3s ease;
+}
+
+.header a:hover {
+    color: #ffcc00; /* Change to your desired color */
+}
+.box img:hover {
+    transform: scale(1.05);
+    transition: transform 0.2s ease;
 }
 
 

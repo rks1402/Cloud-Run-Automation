@@ -84,7 +84,7 @@ body {
 }
 
 .dropdown-item {
-    color: #fff !important;
+    color: #464343 !important;
 }
 
 .dropdown-item:hover {
@@ -107,8 +107,8 @@ body {
     color: #333;
 }
 .welcome {
-    font-size: 25px;
-    font-weight: bold;
+    font-size: 17px;
+    font-family: 'Times New Roman', Times, serif;
   }
 
 
@@ -162,6 +162,25 @@ body {
     font-weight: bold; /* Highlight the active link */
 }
 
+.product {
+    animation: pulse 2s infinite;
+    
+}
+
+@keyframes pulse {
+    0% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.05);
+    }
+    100% {
+        transform: scale(1);
+    }
+}
+.product:hover {
+    background-color: #f5c0c0;
+}
 
 
 
@@ -279,6 +298,7 @@ body {
         margin-top: 0;
         margin-bottom: 10px;
     }
+    
 }
 
 

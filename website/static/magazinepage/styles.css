@@ -48,7 +48,7 @@ body {
 }
 
 .dropdown-item {
-    color: #fff !important;
+    color: #464343 !important;
 }
 
 .dropdown-item:hover {
@@ -201,6 +201,8 @@ body {
 .article-toggle:hover {
     text-decoration: underline;
 }
+
+
 
 /* Responsive adjustments for article section */
 @media (max-width: 768px) {
