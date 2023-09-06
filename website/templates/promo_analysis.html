@@ -90,28 +90,8 @@
 
     <div class="container-fluid">
         <div class="row">
-            <div class="col-md-4">
-                <!-- Flip Card Container -->
-                <div class="flip-card">
-                    <div class="flip-card-inner">
-                        <!-- Summary Side -->
-                        <div class="flip-card-front horizontal-container">
-                            <div class="summary">
-                                <h6>User Summary :</h6>
-                                {{summary}}
-                            </div>
-                        </div>
-                        <!-- JSON Data Side -->
-                        <div class="flip-card-back horizontal-container">
-                            <div class="json">
-                                <h6>JSON Data :</h6>
-                                <pre>{{json_part}}</pre>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-4">
+            
+            <div class="col-md-6">
                 <!-- Marketing Prompt Box Container -->
                 <div class="horizontal-container">
                     <div class="template">
@@ -119,52 +99,73 @@
                         {{text_part}} <!-- Replace this with your promotional text -->
                     </div>
                 </div>
-                <!--<div class="horizontal-container">
-                    <div class="template">
-                        <h6>Discount :</h6>
-                    
-                        {{discount}}  
-                    </div>
-                </div>-->
                 
             </div>
-            <div class="col-md-4">
+            <div class="col-md-6">
                 <!-- Marketing Prompt Box Container -->
                 <div class="horizontal-container">
                     <div class="template">
-                        <h6>User Promotional Text :</h6>
-                        <!-- Display previous and current promotional texts as an unordered list -->
-                        <div>
-                        <ul id="user-promotional-text">
-                            <!-- Previous texts will be added here -->
-                        </ul>
-                        </div>
+                        <h6>Promotional Metrics:</h6>
+                        <!-- Parse the JSON string into a JavaScript object -->
+                        <script>
+                            var jsonString = `{{ summary | safe }}`; // Use backticks to preserve line breaks
+                            var metrics = JSON.parse(jsonString);
+                        </script>
+                        <!-- Display promotional metrics in a table -->
+                        <table class="table table-bordered">
+                            <tbody>
+                                <tr>
+                                    <th scope="row">Promotion Tone</th>
+                                    <td id="promotionTone"></td>
+                                </tr>
+                                <tr>
+                                    <th scope="row">Emotion</th>
+                                    <td id="emotion"></td>
+                                </tr>
+                                <tr>
+                                    <th scope="row">Season</th>
+                                    <td id="season"></td>
+                                </tr>
+                                <tr>
+                                    <th scope="row">Occasion</th>
+                                    <td id="occasion"></td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
-                
-                
-                
-                
-                
-            </div>
-            
-            
-            <!-- Button to reload the page -->
-            <div class="reload-button">
-                <button class="btn btn-primary" onclick="location.reload()">Regenerate Promotional Text</button>
-            </div>
-            <br>
-            <div class="reload-button">
-                <a href="{{ url_for('views.promo_analysis') }}"><button class="btn btn-primary" >Promotional Analysis</button></a> 
             </div>
         </div>
     </div>
+
+<!-- Button to toggle the product display -->
+<button class="btn btn-success ml-2" id="shopNowButton">View The Collection</button>
+
+<!-- Product Display -->
+<div class="container-fluid product-container" id="productDisplayContainer" style="display: none;">
+    {% for product in products %}
+      <div class="product">
+        <a href="{{ url_for('views.product_details', product_id=product.product_ID) }}">
+          <img src="{{ product.image_URL }}" alt="{{ product.product_name }}">
+          <h2>{{ product.product_name }}</h2>
+          <p>Price: ${{ product.price }}</p>
+        </a>
+      </div>
+    {% endfor %}
+</div>
 
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/js/bootstrap.bundle.min.js"
         integrity="sha384-HwwvtgBNo3bZJJLYd8oVXjrBZt8cqVSpeBNS5n7C8IVInixGAoxmnlMuBnhbgrkm"
         crossorigin="anonymous"></script>
-    <script src="../static/marketingpage/scripts.js"></script>
+    <script src="../static/promo_analysis/scripts.js"></script>    
+    <script>
+        document.getElementById('promotionTone').textContent = metrics['promotion tone'];
+        document.getElementById('emotion').textContent = metrics['emotion'];
+        document.getElementById('season').textContent = metrics['season'];
+        document.getElementById('occasion').textContent = metrics['occasion'];
+    </script>
+    
 </body>
 
 </html>
