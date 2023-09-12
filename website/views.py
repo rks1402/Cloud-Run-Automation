@@ -4,6 +4,8 @@ from google.cloud import datastore
 from google.cloud import vision_v1
 from google.cloud.vision_v1 import types
 from colorthief import ColorThief
+from google.cloud import storage, vision
+from werkzeug.utils import secure_filename
 import io
 import json
 import datetime
@@ -15,13 +17,13 @@ import google.generativeai as palm
 from google.cloud import storage
 from google.cloud import datastore
 import requests
-
+from typing import Sequence
 import re
 
 views = Blueprint('views', __name__)
 
 
-
+BASE_URL = "https://drzz-services-hmvyexj3oa-el.a.run.app"
 
 @views.route('/')
 def home():
@@ -34,7 +36,11 @@ def home():
 
 # Function to fetch products with pagination
 def fetch_products(page, per_page):
-    response = requests.get('https://full-iqcjxj5v4a-el.a.run.app/get_all_product')  # Replace with your actual API URL
+    
+    endpoint = '/service/product/all_products'
+    api_url = f'{BASE_URL}{endpoint}'
+
+    response = requests.get(api_url)  # Replace with your actual API URL
     products = response.json()
 
     total_products = len(products)
@@ -65,8 +71,9 @@ def homepage():
 
 @views.route('/product/<string:product_id>')
 def product_details(product_id):
-    api_url = f"https://fetch-iqcjxj5v4a-el.a.run.app/get_record?product_id={product_id}"
-    response = requests.get(api_url)
+    endpoint = '/service/product/id'
+    api_url = f"{BASE_URL}{endpoint}"
+    response = requests.post(api_url,json={"product_id": product_id})
     product_data = response.json()
 
     return render_template('product_description.html', product=product_data)
@@ -78,7 +85,9 @@ def product_details(product_id):
 
 
 def fetch_products_styleme():
-    response = requests.get('https://full-iqcjxj5v4a-el.a.run.app/get_all_product')  # Replace with your actual API URL
+    endpoint = '/service/product/all_products'
+    api_url = f"{BASE_URL}{endpoint}"
+    response = requests.get(api_url)  # Replace with your actual API URL
     products = response.json()
     return products[:3]
 
@@ -90,66 +99,90 @@ def styleme():
      
     return render_template('styleme.html', products=products)
 
-@views.route('/magazine')
-def magazine():  
 
+
+# Function to get articles for a magazine
+def get_articles(magazine_id):
+    try:
+        endpoint = '/service/get_articles'
+        api_url = f"{BASE_URL}{endpoint}"
+        response = requests.post(api_url, json={'magazine_id': magazine_id})
+        response.raise_for_status()  # Raise an exception for HTTP errors
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        # Handle the exception and return an error response
+        return None
+
+# Function to ask a question to the chatbot
+def ask_question(user_question, magazine_id, articles):
+    try:
+        endpoint = '/service/ai/magazine_qna'
+        api_url = f"{BASE_URL}{endpoint}"
+        payload = {
+            'question': user_question,
+            'articles': articles,
+            'magazine_id': magazine_id
+        }
+        response = requests.post(api_url, json=payload)
+        response.raise_for_status()  # Raise an exception for HTTP errors
+        return response.json().get('answer', 'Sorry, I couldn\'t find an answer.')
+    except requests.exceptions.RequestException as e:
+        # Handle the exception and return an error response
+        return 'An error occurred while communicating with the chatbot.'
+
+# Flask route for the magazine page
+@views.route('/magazine')
+def magazine():
     return render_template('magazine.html')
 
-CLOUD_FUNCTION_URL = 'https://asia-south1-gen-ai-app.cloudfunctions.net/get-articles'
-
+# Flask route to get articles for a specific magazine
 @views.route('/magazine/<magazine_id>')
 def magazines(magazine_id):
-    response = requests.post(CLOUD_FUNCTION_URL, json={'magazine_id': magazine_id})
-    articles = response.json()
+    # Store the magazine_id in the session
+    session['magazine_id'] = magazine_id
+
+    articles = get_articles(magazine_id)
+    if articles is None:
+        return jsonify({'error': 'An error occurred while fetching articles.'}), 500
 
     return render_template('magazine.html', articles=articles)
 
+# Flask route to handle user questions
+@views.route('/qna', methods=['POST'])
+def qna():
+    # Get the magazine_id from the session
+    magazine_id = session.get('magazine_id')
 
-# Initialize the Datastore client
-datastore_client = datastore.Client()
+    if magazine_id is None:
+        return jsonify({'error': 'Magazine ID not found in the session.'}), 400
 
-# def fetchCustomerMetrics():
-#     try:
-#         customer_id = "C001"
-#         print(customer_id)
-#         if not customer_id:
-#             return 'Missing customerId parameter', 400
+    user_question = request.json.get('question')
+    if not user_question:
+        return jsonify({'error': 'Empty question.'}), 400
 
-#         query = datastore_client.query(kind='metric')  
-#         # Add a filter to fetch data specific to the provided customer ID
-#         query.add_filter('customer_id', '=', customer_id)
+    articles = get_articles(magazine_id)
+    if articles is None:
+        return jsonify({'error': 'An error occurred while fetching articles.'}), 500
 
-#         entities = list(query.fetch())
-        
-#         return entities
-#     except Exception as e:
-#         return str(e), 500
+    answer = ask_question(user_question, magazine_id, articles)
 
-# def fetch_products_with_discount(discount_value):
-#     try:
-#         # Create a client to interact with Google Cloud Datastore
-#         client = datastore.Client()
+    # Return the answer as a JSON response
+    return jsonify({'answer': answer})
 
-#         # Define the kind (entity type) in Datastore
-#         kind = "MasterData"
 
-#         # Define a query to filter products with a specific discount
-#         query = client.query(kind=kind)
-#         query.add_filter("discount", "=", str(discount_value))
+'''@views.route('/qna', methods=['POST'])
+def qna():
+    user_question = request.json.get('question')
 
-#         # Print the query being executed
-#         print(f"Executing query: {query}")
+    # Sample response - you should replace this with your actual logic
+    answer = "This is a sample answer to your question: " + user_question
 
-#         # Execute the query and fetch matching products
-#         matching_products = list(query.fetch())
+    # Return the answer as JSON
+    return jsonify({'answer': answer})'''
 
-#         # Print the number of matching products
-#         print(f"Found {len(matching_products)} matching products")
 
-#         return matching_products
-#     except Exception as e:
-#         print(f"Error fetching products: {str(e)}")
-#         return []
+
+
 
 
 
@@ -158,7 +191,6 @@ datastore_client= datastore.Client()
 @views.route('/marketing')
 def marketing():
     if 'chat_id' in session:
-        API_URL = "https://summary-gen-ai-api-hmvyexj3oa-el.a.run.app/summarize"
 
         chat_id = session.get('chat_id')
         client = datastore.Client()
@@ -169,39 +201,22 @@ def marketing():
             # Get the summary from the conversation entity
             summary = conversation_entity.get("summary", "No summary available.")
         
-    
-        
-        json= '''{
-            "age": 35,
-        "gender": "female",
-        "income": "high",
-        "occupation": "professional",
-        "tone of text": "friendly"
-        "location": "urban"
-        }'''
-        
-        # Test POST request
-        prompt = summary + f" Read the above passage and create a promotion advertisement banner text as one liner for the clothing, return the user data in JSON format like this."
-        data = {"content": prompt}
+
+        data = {"content": summary}
         
         # json_metrics = fetchCustomerMetrics()
+        endpoint = '/service/ai/promotion'
+        api_url = f"{BASE_URL}{endpoint}"
 
-        response_post = requests.post(API_URL, json=data)
+        response_post = requests.post(api_url, json=data)
         if response_post.status_code == 200:
             response_data = response_post.json()
             response = response_data.get("summary", "No summary available.")
-            pattern = r'({.*})\s+(.+)'
-            match = re.search(pattern, response, re.DOTALL)
-
-            if match:
-                json_part = match.group(1)
-                text_part = match.group(2)
             
-            
-            session['promo'] = text_part
+            session['promo'] = response
            
           
-            return render_template('marketing.html', json_part=json_part,text_part=text_part,summary=summary)
+            return render_template('marketing.html',text_part=response,summary=summary)
         
         else:
             print("POST Request Failed!")
@@ -210,75 +225,63 @@ def marketing():
     else:
             summary = "Session is not present. Please add some script in StyleMe first."
             return render_template('marketing.html',summary=summary)
-    
 
-"""@views.route('/upload', methods=['POST'])
+
+# Initialize the Google Cloud Storage client
+storage_client = storage.Client()
+bucket_name = 'uploaded-cloth'  # Replace with your GCS bucket name
+
+
+
+@views.route('/upload', methods=['POST'])
 def upload():
-    file = request.files['file']
-    if file:
-        # Modify the filename to include the poker_board_id
-        filename = file.filename
-        # Upload the file to Google Cloud Storage
-        client = storage.Client()
-        bucket_name = 'upload_imagwa'  # Replace with your bucket name
-        bucket = client.get_bucket(bucket_name)
-        blob = bucket.blob(filename)
-        blob.upload_from_file(file)
+    # Handle the uploaded image
+    uploaded_image = request.files['file']
+    if uploaded_image:
+        # Ensure the filename is secure (prevents directory traversal attacks)
+        filename = secure_filename(uploaded_image.filename)
+        # Upload the image to GCS
+        image_blob = upload_image_to_gcs(uploaded_image, filename)
+        # Analyze the image using its GCS URI
+        image_uri = f'gs://{bucket_name}/{image_blob.name}'
+        features = [vision.Feature.Type.WEB_DETECTION]
+        response = analyze_image_from_uri(image_uri, features)
+        original_image_url = image_blob.public_url
+        visually_similar_images = get_visual_similar_images(response)
+        return render_template('upload.html', original_image_url=original_image_url, visually_similar_images=visually_similar_images)
 
-        flash('File uploaded successfully!', 'success')
-        return redirect('/lookalike')
+def upload_image_to_gcs(uploaded_image, filename):
+    # Create a blob in the GCS bucket with the provided filename
+    bucket = storage_client.bucket(bucket_name)
+    image_blob = bucket.blob(filename)
+    # Upload the image file to the blob
+    image_blob.upload_from_string(uploaded_image.read(), content_type=uploaded_image.content_type)
+    return image_blob
 
-    flash('No File is Selected.', 'danger')
-    return redirect('/lookalike')"""
+def analyze_image_from_uri(image_uri: str, feature_types: list) -> vision.AnnotateImageResponse:
+    client = vision.ImageAnnotatorClient()
+    image = vision.Image()
+    image.source.image_uri = image_uri
+    features = [vision.Feature(type_=feature_type) for feature_type in feature_types]
+    request = vision.AnnotateImageRequest(image=image, features=features)
 
-def analyze_image(image_file):
-    # Initialize the Vision API client
-    client = vision_v1.ImageAnnotatorClient()
+    response = client.annotate_image(request=request)
+    return response
 
-    # Read the image content from the uploaded file
-    image_content = image_file.read()
+def get_visual_similar_images(response):
+    visually_similar_images = []
+    if response.web_detection and response.web_detection.visually_similar_images:
+        for image in response.web_detection.visually_similar_images:
+            visually_similar_images.append(image.url)
+          
+    return visually_similar_images[:4]
 
-    # Create a Vision API image object from the content
-    image = types.Image(content=image_content)
 
-    # Perform label detection using Vision API
-    response = client.label_detection(image=image)
-    labels = [label.description for label in response.label_annotations]
-
-    # Use colorthief to get the dominant color
-    color_thief = ColorThief(io.BytesIO(image_content))
-    dominant_color = color_thief.get_color(quality=1)
-
-    # Create a JSON output with analysis results
-    analysis_result = {
-        "labels": labels,
-        "dominant_color": dominant_color
-    }
-
-    return analysis_result
-
-@views.route("/upload", methods=["POST"])
-def upload():
-    print("Analyzing image...")
-    if "file" not in request.files:
-        return jsonify({"error": "No file part"})
-
-    file = request.files["file"]
-    if file.filename == "":
-        return jsonify({"error": "No selected file"})
-
-    if file:
-        analysis_result = analyze_image(file)
-        return jsonify(analysis_result)
-    
-    print("Analysis results:", analysis_result)
-    return jsonify(analysis_result)
 
 def chat_summary():
 
     client = datastore.Client()
 
-    API_URL = "https://summary-gen-ai-api-hmvyexj3oa-el.a.run.app/summarize"
     chat_id = session.get('chat_id')
     conversation_entity = client.get(client.key('Conversation', chat_id))
     if conversation_entity:
@@ -289,7 +292,10 @@ def chat_summary():
 
     data = {"content": prompt}
 
-    response_post = requests.post(API_URL, json=data)
+    endpoint = '/service/ai/summarize'
+    api_url = f"{BASE_URL}{endpoint}"
+
+    response_post = requests.post(api_url, json=data)
     if response_post.status_code == 200:
         response_data = response_post.json()
         summary = response_data.get("summary", "No summary available.")
@@ -314,10 +320,12 @@ def chathistory():
         products = session.get('products')
     else:
         products = fetch_products_lookalike()
-    return render_template('chathistory.html', products=products[:3], summary = summary)
+    return render_template('chathistory.html', products=products, summary = summary)
 
 def fetch_products_lookalike():
-    response = requests.get('https://full-iqcjxj5v4a-el.a.run.app/get_all_product')
+    endpoint = '/service/product/all_products'
+    api_url = f"{BASE_URL}{endpoint}"
+    response = requests.get(api_url)
     products = response.json()
     return products[:3]  # Return only the first three products
 
@@ -333,9 +341,10 @@ def lookalike():
 def fetch_products_men(page, per_page):
 
     gender = "men"  # API parameter in uppercase
-    url = f"https://gender-iqcjxj5v4a-el.a.run.app/get_by_gender?gender={gender}"
     
-    response = requests.get(url)
+    endpoint = '/service/product/gender'
+    api_url = f"{BASE_URL}{endpoint}?gender={gender}"
+    response = requests.get(api_url)
     
     products = response.json()
 
@@ -361,9 +370,9 @@ def fetch_men_data():
 
 def fetch_products_women(page, per_page):
     gender = "women"  # API parameter in uppercase
-    url = f"https://gender-iqcjxj5v4a-el.a.run.app/get_by_gender?gender={gender}"
-    
-    response = requests.get(url)
+    endpoint = '/service/product/gender'
+    api_url = f"{BASE_URL}{endpoint}?gender={gender}"
+    response = requests.get(api_url)
     
     products = response.json()
 
@@ -389,9 +398,9 @@ def fetch_women_data():
 
 def fetch_products_boys(page, per_page):
     gender = "boys"  # API parameter in uppercase
-    url = f"https://gender-iqcjxj5v4a-el.a.run.app/get_by_gender?gender={gender}"
-    
-    response = requests.get(url)
+    endpoint = '/service/product/gender'
+    api_url = f"{BASE_URL}{endpoint}?gender={gender}"
+    response = requests.get(api_url)
     
     products = response.json()
 
@@ -417,9 +426,9 @@ def fetch_boys_data():
 
 def fetch_products_girls(page, per_page):
     gender = "girls"  # API parameter in uppercase
-    url = f"https://gender-iqcjxj5v4a-el.a.run.app/get_by_gender?gender={gender}"
-    
-    response = requests.get(url)
+    endpoint = '/service/product/gender'
+    api_url = f"{BASE_URL}{endpoint}?gender={gender}"
+    response = requests.get(api_url)
     
     products = response.json()
 
@@ -447,9 +456,10 @@ def fetch_girls_data():
 
 def fetch_products_wedding(page, per_page):
     ocassion = "wedding"  # API parameter in uppercase
-    url = f"https://ocassion-iqcjxj5v4a-el.a.run.app/product/ocassion?ocassion={ocassion}"
     
-    response = requests.get(url)
+    endpoint = '/service/product/ocassion'
+    api_url = f"{BASE_URL}{endpoint}?ocassion={ocassion}"
+    response = requests.get(api_url)
     
     products = response.json()
 
@@ -476,9 +486,9 @@ def fetch_wedding_data():
 
 def fetch_products_party(page, per_page):
     ocassion = "party"  # API parameter in uppercase
-    url = f"https://ocassion-iqcjxj5v4a-el.a.run.app/product/ocassion?ocassion={ocassion}"
-    
-    response = requests.get(url)
+    endpoint = '/service/product/ocassion'
+    api_url = f"{BASE_URL}{endpoint}?ocassion={ocassion}"
+    response = requests.get(api_url)
     
     products = response.json()
 
@@ -504,9 +514,9 @@ def fetch_party_data():
 
 def fetch_products_casual(page, per_page):
     ocassion = "casual"  # API parameter in uppercase
-    url = f"https://ocassion-iqcjxj5v4a-el.a.run.app/product/ocassion?ocassion={ocassion}"
-    
-    response = requests.get(url)
+    endpoint = '/service/product/ocassion'
+    api_url = f"{BASE_URL}{endpoint}?ocassion={ocassion}"
+    response = requests.get(api_url)
     
     products = response.json()
 
@@ -549,9 +559,9 @@ def fetch_casual_data():
 
 def fetch_products_birthday(page, per_page):
     ocassion = "birthday"  # API parameter in uppercase
-    url = f"https://ocassion-iqcjxj5v4a-el.a.run.app/product/ocassion?ocassion={ocassion}"
-    
-    response = requests.get(url)
+    endpoint = '/service/product/ocassion'
+    api_url = f"{BASE_URL}{endpoint}?ocassion={ocassion}"
+    response = requests.get(api_url)
     
     products = response.json()
 
@@ -579,9 +589,9 @@ def fetch_birthday_data():
 
 def fetch_products_formal(page, per_page):
     ocassion = "formal"  # API parameter in uppercase
-    url = f"https://ocassion-iqcjxj5v4a-el.a.run.app/product/ocassion?ocassion={ocassion}"
-    
-    response = requests.get(url)
+    endpoint = '/service/product/ocassion'
+    api_url = f"{BASE_URL}{endpoint}?ocassion={ocassion}"
+    response = requests.get(api_url)
     
     products = response.json()
 
@@ -607,9 +617,9 @@ def fetch_formal_data():
 
 def fetch_products_vacation(page, per_page):
     ocassion = "vacation"  # API parameter in uppercase
-    url = f"https://ocassion-iqcjxj5v4a-el.a.run.app/product/ocassion?ocassion={ocassion}"
-    
-    response = requests.get(url)
+    endpoint = '/service/product/ocassion'
+    api_url = f"{BASE_URL}{endpoint}?ocassion={ocassion}"
+    response = requests.get(api_url)
     
     products = response.json()
 
@@ -637,9 +647,10 @@ def fetch_vacation_data():
 def fetch_search_dataa(page, per_page):
     search_query = request.args.get('query')
     print(search_query)  # API parameter in uppercase
-    url = f"https://get-product-by-description-hmvyexj3oa-el.a.run.app/get_product_by_description?query={search_query}"
     
-    response = requests.get(url)
+    endpoint = '/service/product/description'
+    api_url = f"{BASE_URL}{endpoint}?query={search_query}"
+    response = requests.get(api_url)
     products = response.json()
 
     total_products = len(products)
@@ -694,7 +705,9 @@ def parse_conversation(text):
 def store_conversation_in_datastore(conversation_data):
     try:
         # Make a POST request to the cloud function
-        response = requests.post("https://asia-south1-gen-ai-app.cloudfunctions.net/chat_to_datastore", json=conversation_data)
+        endpoint = '/service/store_conversation'
+        api_url = f"{BASE_URL}{endpoint}"
+        response = requests.post(api_url, json=conversation_data)
 
         if response.status_code == 200:
             response_data = response.json()  # Parse the response JSON
@@ -724,9 +737,12 @@ def store_conversation_in_datastore(conversation_data):
     
 def get_product_by_json_summary(summary):
     try:
+        print(summary)
         print(type(summary))
         # Make a POST request to the cloud function
-        response = requests.post("https://asia-south1-gen-ai-app.cloudfunctions.net/get-product-by-ocassion-and-demographics", json = summary)
+        endpoint = '/service/product/recommendation'
+        api_url = f"{BASE_URL}{endpoint}"
+        response = requests.post(api_url, json = summary)
 
         print(response)
         response_data = response.json()  # Parse the response JSON
@@ -741,17 +757,25 @@ def get_product_by_json_summary(summary):
     
 def get_products_by_id(product_ids):
     try:
-        
-        
-        # Make a POST request to the cloud function
-        response = requests.post("https://asia-south1-gen-ai-app.cloudfunctions.net/get-products-by-id", json = product_ids)
+        # Make a POST request to the cloud function for each product ID
+        product_details = []
+        print(product_ids)
+        for product_id in product_ids['product_ids']:
+            print(product_id)
 
-        print(response)
-        response_data = response.json()  # Parse the response JSON
-        print(response_data)
-        return response_data
-        
-        
+            endpoint = '/service/product/id'
+            api_url = f"{BASE_URL}{endpoint}"
+            response = requests.post(api_url, json={"product_id": product_id})
+            
+            if response.status_code == 200:
+                response_data = response.json()  # Parse the response JSON
+                product_details.append(response_data)
+            else:
+                # Handle the error response if needed
+                print(f"Failed to fetch details for product ID {product_id}: {response.status_code}")
+
+        return product_details
+
     except Exception as e:
         return {
             "message": str(e)
@@ -759,7 +783,6 @@ def get_products_by_id(product_ids):
 
 @views.route('/submit_chat', methods=['POST'])
 def submit_chat():
-    API_URL = "https://summary-gen-ai-api-hmvyexj3oa-el.a.run.app/summarize"
 
     chat = request.form['chat']
     conversation = parse_conversation(chat)
@@ -767,28 +790,11 @@ def submit_chat():
 
     response_message = store_conversation_in_datastore(chat_conversation)
 
-    #return jsonify({"message": response_message})
-    occasion_demographics = """
-    {
-        "Occasion": "wedding",
-        "color": "black",
-        "material": "silk",
-        "pattern": "solid",
-        "Demographics": {
-            "Budget": {
-            "Min": 150,
-            "Max": 200
-            },
-            "gender": "men",
-            "Style": "Classic and Elegant"
-        }
-    }
-        """
-    # Test POST request
-    prompt = chat + "Give the User Occasion and demographics from this conversation in JSON format." + occasion_demographics + "Don't give color. and gender can be only from (boys,girls,women and men)"
-    data = {"content": prompt}
+    data = {"chat": chat}
 
-    response_post = requests.post(API_URL, json=data)
+    endpoint = '/service/ai/demographic_json'
+    api_url = f"{BASE_URL}{endpoint}"
+    response_post = requests.post(api_url, json=data)
     if response_post.status_code == 200:
         response_data = response_post.json()
         summary = response_data.get("summary", "No summary available.")
@@ -804,6 +810,7 @@ def submit_chat():
         print(product_ids)
         print(type(product_ids))
         products = get_products_by_id(product_ids)
+        print(products)
         session['products'] = products
         #return products
         return render_template('styleme.html', products=products)
@@ -817,24 +824,19 @@ def submit_chat():
 def promo_analysis():
 
     promo = session.get('promo')
+    # Find the index of the colon ":" after the target text
+    start_index = promo.find("**Promotion advertisement banner text:**") + len("**Promotion advertisement banner text:**")
 
-    API_URL = "https://summary-gen-ai-api-hmvyexj3oa-el.a.run.app/summarize"
+    # Extract the string after the colon
+    result = promo[start_index:].strip()
 
-    #return jsonify({"message": response_message})
-    sample = """
-    {
-        
-        "promotion tone": "friendly",
-        "emotion": "positive",
-        "season": "fall",
-        "occasion": "wedding"
-    }
-        """
-    # Test POST request
-    prompt = "You are the marketing campaign consultant, Review the following text in the triple quotes and give the tone, emotion ,season and occasion from the text and return the value as son attributes. for any missing value, mention as null  " + promo + "sample json like  " + sample
-    data = {"content": prompt}
+    print(result)
 
-    response_post = requests.post(API_URL, json=data)
+    data = {"promotion_text": result}
+
+    endpoint = '/service/ai/promotion_evaluation'
+    api_url = f"{BASE_URL}{endpoint}"
+    response_post = requests.post(api_url, json=data)
     if response_post.status_code == 200:
         response_data = response_post.json()
         summary = response_data.get("summary", "No summary available.")
@@ -845,4 +847,3 @@ def promo_analysis():
     return render_template('promo_analysis.html', text_part = promo, summary=summary ,products=products[:3])
 
      
-
